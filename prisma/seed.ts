@@ -32,36 +32,46 @@ async function main() {
     },
   });
 
-  // 3. Sample Users for each role (clearly marked as sample data)
+  // 3. Sample Users for each role (Password: "ValueMark2026!")
+  // Clearly marked as sample fixtures for development testing
+  const { genSalt, hash } = await import("bcrypt-ts");
+  const salt = await genSalt(10);
+  const samplePasswordHash = await hash("ValueMark2026!", salt);
+
   const sampleUsers = [
     {
       id: "sample-user-admin",
       name: "Sample Admin",
       email: "admin.sample@valuemark.example",
+      passwordHash: samplePasswordHash,
       roles: [UserRole.ADMIN],
     },
     {
       id: "sample-user-valuer",
       name: "Sample Valuer",
       email: "valuer.sample@valuemark.example",
+      passwordHash: samplePasswordHash,
       roles: [UserRole.VALUER],
     },
     {
       id: "sample-user-reviewer",
       name: "Sample Reviewer",
       email: "reviewer.sample@valuemark.example",
+      passwordHash: samplePasswordHash,
       roles: [UserRole.REVIEWER],
     },
     {
       id: "sample-user-clerk",
       name: "Sample Clerk",
       email: "clerk.sample@valuemark.example",
+      passwordHash: samplePasswordHash,
       roles: [UserRole.CLERK],
     },
     {
       id: "sample-user-viewer",
       name: "Sample Viewer",
       email: "viewer.sample@valuemark.example",
+      passwordHash: samplePasswordHash,
       roles: [UserRole.VIEWER],
     },
   ];
@@ -69,7 +79,7 @@ async function main() {
   for (const user of sampleUsers) {
     await prisma.user.upsert({
       where: { email: user.email },
-      update: {},
+      update: { passwordHash: samplePasswordHash },
       create: user,
     });
   }

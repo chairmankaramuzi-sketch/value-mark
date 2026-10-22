@@ -130,8 +130,9 @@ enum DeliveryStatus {
 model User {
   id        String     @id @default(cuid())
   email     String     @unique
-  name      String
-  authId    String?    @unique // Foreign ID from auth provider (e.g. Supabase Auth)
+  name         String
+  passwordHash String?
+  authId       String?    @unique // Foreign ID from auth provider (e.g. Supabase Auth)
   roles     UserRole[] @default([VIEWER])
   isActive  Boolean    @default(true)
   createdAt DateTime   @default(now())
