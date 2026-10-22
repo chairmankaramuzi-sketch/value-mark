@@ -1,0 +1,639 @@
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ----------------------------------------------------
+// ENUMS
+// ----------------------------------------------------
+
+enum UserRole {
+  ADMIN
+  VALUER
+  REVIEWER
+  CLERK
+  VIEWER
+}
+
+enum ClientType {
+  INDIVIDUAL
+  ORGANIZATION
+}
+
+enum AssetCategory {
+  LAND
+  BUILDING
+  VEHICLE
+  MACHINERY
+  OTHER
+}
+
+enum JobStatus {
+  NEW
+  ASSIGNED
+  INSPECTION_SCHEDULED
+  INSPECTED
+  VALUATION_IN_PROGRESS
+  DRAFT_REPORT
+  SUBMITTED_FOR_REVIEW
+  CHANGES_REQUESTED
+  APPROVED
+  DELIVERED
+  ARCHIVED
+  CANCELLED
+}
+
+enum LandTenure {
+  FREEHOLD
+  LEASEHOLD
+  MAILO
+  CUSTOMARY
+  OTHER
+}
+
+enum AreaUnit {
+  SQ_M
+  ACRES
+  HECTARES
+  SQ_FT
+}
+
+enum EvidenceType {
+  SALE
+  ASKING
+  RENT
+  VALUATION_RECORD
+}
+
+enum ValuationMethod {
+  COMPARISON
+  DRC_COST
+  INCOME_CAPITALIZATION
+  RESIDUAL
+  OTHER
+}
+
+enum ValuationBasis {
+  MARKET_VALUE
+  FORCED_SALE_VALUE
+  REPLACEMENT_COST
+  INSURANCE_VALUE
+}
+
+enum RoundingPolicy {
+  NONE
+  ROUND_TO_THOUSAND
+  ROUND_TO_HUNDRED_THOUSAND
+  ROUND_TO_MILLION
+}
+
+enum WorksheetReviewState {
+  DRAFT
+  SUBMITTED
+  REVIEWED
+}
+
+enum ReportStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  SUPERSEDED
+}
+
+enum ReviewDecision {
+  APPROVED
+  CHANGES_REQUESTED
+}
+
+enum DeliveryMethod {
+  EMAIL
+  IN_PERSON_HARDCOPY
+  CLIENT_DOWNLOAD
+  PORTAL
+}
+
+enum DeliveryStatus {
+  PENDING
+  DELIVERED
+  FAILED
+}
+
+// ----------------------------------------------------
+// USER & ACCESS
+// ----------------------------------------------------
+
+model User {
+  id        String     @id @default(cuid())
+  email     String     @unique
+  name      String
+  authId    String?    @unique // Foreign ID from auth provider (e.g. Supabase Auth)
+  roles     UserRole[] @default([VIEWER])
+  isActive  Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  assignedJobs       ValuationJob[]       @relation("ValuerJobs")
+  reviewedJobs       ValuationJob[]       @relation("ReviewerJobs")
+  inspections        Inspection[]         @relation("Inspector")
+  mediaUploads       MediaFile[]          @relation("MediaUploader")
+  worksheets         ValuationWorksheet[] @relation("WorksheetAuthor")
+  worksheetsReviewed ValuationWorksheet[] @relation("WorksheetReviewer")
+  reportsCreated     ReportVersion[]      @relation("ReportCreator")
+  reportsApproved    ReportVersion[]      @relation("ReportApprover")
+  reviewsConducted   ReviewAction[]       @relation("ReviewerActions")
+  deliveries         DeliveryRecord[]     @relation("DeliveryActor")
+  auditEvents        AuditEvent[]         @relation("AuditActor")
+
+  @@index([email])
+  @@index([authId])
+}
+
+// ----------------------------------------------------
+// CLIENTS
+// ----------------------------------------------------
+
+model Client {
+  id            String     @id @default(cuid())
+  reference     String     @unique // e.g. "CLI-2026-0001"
+  clientType    ClientType @default(INDIVIDUAL)
+  name          String
+  contactPerson String?
+  email         String?
+  phone         String?
+  address       String?
+  notes         String?    @db.Text
+  isArchived    Boolean    @default(false)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  jobs ValuationJob[]
+
+  @@index([reference])
+  @@index([name])
+  @@index([email])
+}
+
+// ----------------------------------------------------
+// VALUATION JOBS
+// ----------------------------------------------------
+
+model ValuationJob {
+  id            String        @id @default(cuid())
+  jobReference  String        @unique // e.g. "VM-2026-0001"
+  clientId      String
+  client        Client        @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  assetCategory AssetCategory @default(LAND)
+  purpose       String // e.g. "Mortgage / Secured Lending", "Financial Reporting"
+  location      String // Property/Site address or location summary
+  currency      String        @default("UGX")
+
+  instructionDate DateTime  @default(now())
+  valuationDate   DateTime?
+  inspectionDate  DateTime?
+  dueDate         DateTime?
+
+  // Key Parties & Inspection Presence
+  borrowerName          String?
+  clientContact         String?
+  inspectedInPresenceOf String?
+
+  // Technical Report Narratives & Observations
+  accessDirections      String? @db.Text
+  distanceFromTarmac    String?
+  neighborhoodNotes     String? @db.Text
+  environmentalNotes    String? @db.Text
+  encumbrancesNotes     String? @db.Text
+  highestBestUse        String? @db.Text
+  suitabilityForLending String? @db.Text
+  specialRemarks        String? @db.Text
+
+  // Structured Analysis Data (SWOT and Ratings)
+  swotAnalysis Json? // { strengths: [], weaknesses: [], opportunities: [], threats: [] }
+  ratingMatrix Json? // { lettability, salability, marketConditions, ... }
+
+  status     JobStatus @default(NEW)
+  valuerId   String
+  valuer     User      @relation("ValuerJobs", fields: [valuerId], references: [id], onDelete: Restrict)
+  reviewerId String?
+  reviewer   User?     @relation("ReviewerJobs", fields: [reviewerId], references: [id], onDelete: SetNull)
+
+  notes           String? @db.Text
+  isArchived      Boolean @default(false)
+  cancelledReason String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  parcels        AssetParcel[]
+  assetDetail    AssetDetail?
+  inspections    Inspection[]
+  mediaFiles     MediaFile[]
+  evidence       ComparableEvidence[]
+  worksheet      ValuationWorksheet?
+  reportVersions ReportVersion[]
+
+  @@index([jobReference])
+  @@index([clientId])
+  @@index([valuerId])
+  @@index([reviewerId])
+  @@index([status])
+  @@index([assetCategory])
+  @@index([dueDate])
+}
+
+// ----------------------------------------------------
+// ASSET DETAILS (Category-aware)
+// ----------------------------------------------------
+
+model AssetDetail {
+  id    String       @id @default(cuid())
+  jobId String       @unique
+  job   ValuationJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  // Common descriptors
+  propertyName   String?
+  subcategory    String?
+  siteAddress    String?
+  coordinatesLat Decimal?    @db.Decimal(10, 7)
+  coordinatesLng Decimal?    @db.Decimal(10, 7)
+  titleReference String? // Plot/Block/Volume/Folio
+  parcelNumber   String?
+  tenure         LandTenure?
+  occupancyNotes String?     @db.Text
+
+  // Land / Site Attributes
+  landArea             Decimal?  @db.Decimal(15, 4)
+  landAreaUnit         AreaUnit?
+  topography           String?
+  roadAccess           String?
+  servicesAndUtilities String?
+  neighborhoodNotes    String?   @db.Text
+  zoningNotes          String?   @db.Text
+  boundaries           String?   @db.Text
+
+  // Improvements & Buildings
+  buildingType         String?
+  floorArea            Decimal?  @db.Decimal(15, 4)
+  floorAreaUnit        AreaUnit?
+  numberOfFloors       Int?
+  yearBuilt            Int?
+  conditionRating      String?
+  accommodationSummary String?   @db.Text
+  defectsSummary       String?   @db.Text
+
+  // Flexible additional category attributes (vehicles, machinery, etc.)
+  categoryAttributes Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([jobId])
+  @@index([titleReference])
+}
+
+// ----------------------------------------------------
+// ASSET PARCELS (Multi-plot / parcel support)
+// ----------------------------------------------------
+
+model AssetParcel {
+  id    String       @id @default(cuid())
+  jobId String
+  job   ValuationJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  parcelIdentifier String // e.g. "Plot 304 Block 23" or "Untitled Parcel"
+  registeredOwner  String?
+  ownerNIN         String?
+  titleReference   String? // e.g. "FRV RUK115 Folio 8" or "LC1 Sales Agreement"
+  tenure           LandTenure? @default(FREEHOLD)
+  gpsCoordinates   String? // e.g. "-0.795354E, 29.967406N"
+
+  landAreaHectares   Decimal? @db.Decimal(15, 4)
+  landAreaAcres      Decimal? @db.Decimal(15, 4)
+  netUsableArea      String?
+  plotCoverage       String?
+  boundaryDefinition String?  @db.Text
+
+  currentUse       String? // e.g. "Agricultural"
+  zoning           String? // e.g. "Residential/Agricultural"
+  developments     String? @db.Text
+  parkingCapacity  String?
+  occupancyTenancy String?
+
+  // Valuation Figures per parcel
+  appliedRatePerAcre Decimal? @db.Decimal(18, 2)
+  marketValue        Decimal  @default(0) @db.Decimal(18, 2)
+  forcedSaleValue    Decimal  @default(0) @db.Decimal(18, 2)
+  insuranceValue     Decimal  @default(0) @db.Decimal(18, 2)
+  valueInWords       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([jobId])
+  @@index([parcelIdentifier])
+}
+
+// ----------------------------------------------------
+// INSPECTIONS
+// ----------------------------------------------------
+
+model Inspection {
+  id          String       @id @default(cuid())
+  jobId       String
+  job         ValuationJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  inspectorId String
+  inspector   User         @relation("Inspector", fields: [inspectorId], references: [id], onDelete: Restrict)
+
+  scheduledDate     DateTime?
+  inspectionDate    DateTime?
+  attendees         String?
+  weatherConditions String?
+  accessLimitations String?   @db.Text
+  conditionNotes    String?   @db.Text
+  observations      String?   @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  mediaFiles MediaFile[]
+
+  @@index([jobId])
+  @@index([inspectorId])
+}
+
+// ----------------------------------------------------
+// MEDIA & ATTACHMENTS (Private storage keys only)
+// ----------------------------------------------------
+
+model MediaFile {
+  id           String       @id @default(cuid())
+  jobId        String
+  job          ValuationJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  inspectionId String?
+  inspection   Inspection?  @relation(fields: [inspectionId], references: [id], onDelete: SetNull)
+
+  storageKey String  @unique // Private storage path / object ID
+  fileName   String
+  fileSize   Int
+  mimeType   String
+  isVerified Boolean @default(false)
+  caption    String?
+  category   String  @default("PHOTO") // PHOTO, TITLE_DEED, SITE_PLAN, OTHER
+
+  uploaderId String
+  uploader   User   @relation("MediaUploader", fields: [uploaderId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([jobId])
+  @@index([inspectionId])
+  @@index([storageKey])
+}
+
+// ----------------------------------------------------
+// COMPARABLE EVIDENCE
+// ----------------------------------------------------
+
+model ComparableEvidence {
+  id    String       @id @default(cuid())
+  jobId String
+  job   ValuationJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  evidenceType   EvidenceType @default(SALE)
+  isVerifiedFact Boolean      @default(false) // Differentiates verified facts from estimates
+  source         String
+  sourceDate     DateTime?
+  location       String
+  description    String?      @db.Text
+
+  amount   Decimal   @db.Decimal(18, 2)
+  currency String    @default("UGX")
+  size     Decimal?  @db.Decimal(15, 4)
+  sizeUnit AreaUnit?
+
+  adjustmentsSummary String? @db.Text
+  reliabilityRating  String? // e.g. High, Medium, Low
+  notes              String? @db.Text
+  isArchived         Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([jobId])
+  @@index([evidenceType])
+  @@index([location])
+}
+
+// ----------------------------------------------------
+// VALUATION WORKSHEET & CALCULATIONS
+// ----------------------------------------------------
+
+model ValuationWorksheet {
+  id    String       @id @default(cuid())
+  jobId String       @unique
+  job   ValuationJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  method           ValuationMethod @default(COMPARISON)
+  basisOfValuation ValuationBasis  @default(MARKET_VALUE)
+  currency         String          @default("UGX")
+  roundingPolicy   RoundingPolicy  @default(NONE)
+
+  subtotalAmount            Decimal  @db.Decimal(18, 2)
+  finalValuation            Decimal  @db.Decimal(18, 2)
+  forcedSaleValue           Decimal? @db.Decimal(18, 2)
+  insuranceReplacementValue Decimal? @db.Decimal(18, 2)
+
+  professionalRationale String  @db.Text
+  assumptions           String? @db.Text
+  limitations           String? @db.Text
+
+  preparedById String
+  preparedBy   User   @relation("WorksheetAuthor", fields: [preparedById], references: [id], onDelete: Restrict)
+
+  reviewState  WorksheetReviewState @default(DRAFT)
+  reviewedById String?
+  reviewedBy   User?                @relation("WorksheetReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lineItems CalculationLineItem[]
+
+  @@index([jobId])
+  @@index([preparedById])
+}
+
+model CalculationLineItem {
+  id          String             @id @default(cuid())
+  worksheetId String
+  worksheet   ValuationWorksheet @relation(fields: [worksheetId], references: [id], onDelete: Cascade)
+
+  orderIndex        Int      @default(0)
+  description       String
+  unit              String? // e.g. "sq m", "acres", "item"
+  quantity          Decimal? @db.Decimal(15, 4)
+  rate              Decimal? @db.Decimal(18, 2)
+  adjustmentPercent Decimal? @db.Decimal(8, 4)
+  totalAmount       Decimal  @db.Decimal(18, 2)
+  notes             String?
+
+  createdAt DateTime @default(now())
+
+  @@index([worksheetId])
+}
+
+// ----------------------------------------------------
+// REPORT TEMPLATES & VERSIONED REPORTS
+// ----------------------------------------------------
+
+model ReportTemplate {
+  id                  String   @id @default(cuid())
+  name                String
+  version             Int      @default(1)
+  layoutConfig        Json // Section ordering, headers, enabled appendices
+  standardDisclaimers String?  @db.Text
+  isActive            Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  reportVersions ReportVersion[]
+
+  @@unique([name, version])
+}
+
+model ReportVersion {
+  id         String         @id @default(cuid())
+  jobId      String
+  job        ValuationJob   @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  templateId String
+  template   ReportTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
+
+  versionNumber Int          @default(1)
+  status        ReportStatus @default(DRAFT)
+  watermarkText String? // "DRAFT" or null for approved reports
+
+  fileStorageKey     String? // Private storage path for generated PDF
+  sourceDataSnapshot Json // Immutable snapshot of job, asset, worksheet, and evidence
+  dataHash           String // Integrity hash (e.g. SHA-256) of snapshot
+
+  createdById  String
+  createdBy    User      @relation("ReportCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  approvedById String?
+  approvedBy   User?     @relation("ReportApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  reviews    ReviewAction[]
+  deliveries DeliveryRecord[]
+
+  @@unique([jobId, versionNumber])
+  @@index([jobId])
+  @@index([status])
+  @@index([createdById])
+}
+
+// ----------------------------------------------------
+// REVIEW & APPROVAL ACTIONS
+// ----------------------------------------------------
+
+model ReviewAction {
+  id              String        @id @default(cuid())
+  reportVersionId String
+  reportVersion   ReportVersion @relation(fields: [reportVersionId], references: [id], onDelete: Cascade)
+
+  reviewerId String
+  reviewer   User   @relation("ReviewerActions", fields: [reviewerId], references: [id], onDelete: Restrict)
+
+  decision  ReviewDecision
+  comments  String         @db.Text
+  createdAt DateTime       @default(now())
+
+  @@index([reportVersionId])
+  @@index([reviewerId])
+}
+
+// ----------------------------------------------------
+// DELIVERY RECORDS
+// ----------------------------------------------------
+
+model DeliveryRecord {
+  id              String        @id @default(cuid())
+  reportVersionId String
+  reportVersion   ReportVersion @relation(fields: [reportVersionId], references: [id], onDelete: Restrict)
+
+  recipientName         String
+  recipientEmail        String?
+  recipientOrganization String?
+  deliveryMethod        DeliveryMethod @default(EMAIL)
+  deliveredAt           DateTime       @default(now())
+  status                DeliveryStatus @default(DELIVERED)
+  deliveryNotes         String?        @db.Text
+
+  deliveredById String
+  deliveredBy   User   @relation("DeliveryActor", fields: [deliveredById], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+
+  @@index([reportVersionId])
+  @@index([deliveredById])
+}
+
+// ----------------------------------------------------
+// AUDIT LOGGING (Append-Only)
+// ----------------------------------------------------
+
+model AuditEvent {
+  id      String  @id @default(cuid())
+  actorId String?
+  actor   User?   @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  action        String // e.g. "JOB_STATUS_CHANGE", "REPORT_APPROVED", "WORKSHEET_UPDATE"
+  entityType    String // e.g. "ValuationJob", "ReportVersion"
+  entityId      String
+  ipAddress     String?
+  userAgent     String?
+  changeSummary Json? // Sanitized record changes (excludes sensitive tokens/passwords)
+
+  createdAt DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([actorId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+// ----------------------------------------------------
+// COMPANY SETTINGS & REFERENCE NUMBER SEQUENCES
+// ----------------------------------------------------
+
+model CompanySettings {
+  id              String @id @default("default")
+  companyName     String @default("Value Mark")
+  defaultCurrency String @default("UGX")
+  timezone        String @default("Africa/Kampala")
+
+  jobReferencePrefix String  @default("VM")
+  reportNumberPrefix String  @default("RPT")
+  logoStorageKey     String?
+
+  address      String?
+  contactEmail String?
+  contactPhone String?
+
+  updatedAt DateTime @updatedAt
+}
+
+model ReferenceSequence {
+  sequenceKey   String   @id // e.g. "JOB_2026", "REPORT_2026", "CLIENT"
+  currentNumber Int      @default(0)
+  updatedAt     DateTime @updatedAt
+}
