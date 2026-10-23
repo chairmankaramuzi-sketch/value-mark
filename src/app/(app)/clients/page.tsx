@@ -27,7 +27,13 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps) {
   const search = params.search || "";
   const page = Number(params.page) || 1;
 
-  let clientsData = { clients: [] as any[], total: 0, page: 1, limit: 20, totalPages: 1 };
+  let clientsData: Awaited<ReturnType<typeof listClients>> = {
+    clients: [],
+    total: 0,
+    page: 1,
+    limit: 20,
+    totalPages: 1,
+  };
   let errorMsg = null;
 
   try {

@@ -1,10 +1,8 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import {
-  Calendar,
   Compass,
   FileText,
-  MapPin,
   Phone,
   Shield,
   User,
@@ -20,7 +18,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/display";
-import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,

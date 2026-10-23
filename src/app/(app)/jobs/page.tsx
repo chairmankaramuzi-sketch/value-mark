@@ -36,7 +36,13 @@ export default async function JobsPage({ searchParams }: JobsPageProps) {
   const assetCategory = (params.category as AssetCategory) || undefined;
   const page = Number(params.page) || 1;
 
-  let jobsData = { jobs: [] as any[], total: 0, page: 1, limit: 15, totalPages: 1 };
+  let jobsData: Awaited<ReturnType<typeof listJobs>> = {
+    jobs: [],
+    total: 0,
+    page: 1,
+    limit: 15,
+    totalPages: 1,
+  };
   let errorMsg = null;
 
   try {
