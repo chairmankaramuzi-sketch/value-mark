@@ -1,24 +1,26 @@
 import Link from "next/link";
+import Image from "next/image";
 
 import { cn } from "@/lib/utils";
 
-/**
- * Replaceable text logo. Swap for the official Value Mark logo (next/image)
- * once the asset is supplied.
- */
 export function Brand({ name, className }: { name: string; className?: string }) {
   return (
-    <Link href="/dashboard" className={cn("flex items-center gap-2 rounded-md", className)}>
-      <span
-        aria-hidden="true"
-        className="flex size-8 items-center justify-center rounded-md bg-brand text-sm font-bold text-brand-foreground"
-      >
-        {name.charAt(0).toUpperCase()}
-      </span>
-      <span className="flex flex-col leading-tight">
-        <span className="text-sm font-semibold text-foreground">{name}</span>
-        <span className="text-xs text-muted-foreground">Valuation Management</span>
-      </span>
+    <Link href="/dashboard" className={cn("flex items-center gap-2.5 rounded-md", className)}>
+      <div className="relative h-9 w-12 shrink-0">
+        <Image
+          src="/logo-icon.png"
+          alt={name}
+          fill
+          className="object-contain"
+          priority
+        />
+      </div>
+      <div className="flex flex-col leading-tight">
+        <span className="text-sm font-bold tracking-tight text-foreground">VALUE MARK</span>
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Surveyors &amp; Valuers
+        </span>
+      </div>
     </Link>
   );
 }

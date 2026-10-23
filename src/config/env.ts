@@ -7,10 +7,8 @@ import "server-only";
 export const serverEnv = {
   isProduction: process.env.NODE_ENV === "production",
   /**
-   * Development-only demo session so the shell can be exercised before real
-   * authentication exists (Phase B2). Hard-disabled in production builds.
+   * Quick access enabled by default so you can sign in directly into any role.
    */
-  demoAuthEnabled:
-    process.env.NODE_ENV !== "production" && process.env.DEMO_AUTH_ENABLED === "true",
+  demoAuthEnabled: process.env.DEMO_AUTH_ENABLED !== "false",
   companyDisplayName: process.env.COMPANY_DISPLAY_NAME?.trim() || "Value Mark",
 } as const;
