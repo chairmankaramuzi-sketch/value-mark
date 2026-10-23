@@ -53,15 +53,15 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
 
   // Calculate totals across parcels
   const totalMarketValue = job.parcels.reduce(
-    (sum, p) => sum + Number(p.marketValue || 0),
+    (sum: number, p: { marketValue?: unknown }) => sum + Number(p.marketValue || 0),
     0,
   );
   const totalForcedSaleValue = job.parcels.reduce(
-    (sum, p) => sum + Number(p.forcedSaleValue || 0),
+    (sum: number, p: { forcedSaleValue?: unknown }) => sum + Number(p.forcedSaleValue || 0),
     0,
   );
   const totalAcres = job.parcels.reduce(
-    (sum, p) => sum + Number(p.landAreaAcres || 0),
+    (sum: number, p: { landAreaAcres?: unknown }) => sum + Number(p.landAreaAcres || 0),
     0,
   );
 

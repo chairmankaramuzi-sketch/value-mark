@@ -15,7 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { requireUser } from "@/server/auth/session";
-import { listClients } from "@/server/services/client-service";
+import { listClients, type ListClientsResult } from "@/server/services/client-service";
 
 interface ClientsPageProps {
   searchParams: Promise<{ search?: string; page?: string }>;
@@ -27,7 +27,7 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps) {
   const search = params.search || "";
   const page = Number(params.page) || 1;
 
-  let clientsData: Awaited<ReturnType<typeof listClients>> = {
+  let clientsData: ListClientsResult = {
     clients: [],
     total: 0,
     page: 1,

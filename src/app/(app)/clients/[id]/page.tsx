@@ -150,7 +150,7 @@ export default async function ClientDetailPage({ params }: ClientDetailPageProps
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {client.jobs.map((job) => (
+                  {client.jobs.map((job: { id: string; jobReference: string; purpose: string; valuer: { name: string }; status: import("@prisma/client").JobStatus }) => (
                     <TableRow key={job.id}>
                       <TableCell className="font-mono text-xs font-semibold text-brand">
                         <Link href={`/jobs/${job.id}`} className="hover:underline">

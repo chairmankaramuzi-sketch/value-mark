@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/table";
 import { JOB_STATUSES, JOB_STATUS_META } from "@/lib/domain/job-status";
 import { requireUser } from "@/server/auth/session";
-import { listJobs } from "@/server/services/job-service";
+import { listJobs, type ListJobsResult } from "@/server/services/job-service";
 
 interface JobsPageProps {
   searchParams: Promise<{
@@ -36,7 +36,7 @@ export default async function JobsPage({ searchParams }: JobsPageProps) {
   const assetCategory = (params.category as AssetCategory) || undefined;
   const page = Number(params.page) || 1;
 
-  let jobsData: Awaited<ReturnType<typeof listJobs>> = {
+  let jobsData: ListJobsResult = {
     jobs: [],
     total: 0,
     page: 1,
